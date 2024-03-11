@@ -1,0 +1,14 @@
+. EEEE ....
+100
+# 100 0
+
+x NNNN ....
+. EEEE xxxx
+100
+# 0 100
+
+w ESWN bbbb
+b WNES wwww
+5
+# -1 0
+

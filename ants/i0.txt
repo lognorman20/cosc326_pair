@@ -1,0 +1,14 @@
+# Boring
+. EEEE ....
+100
+
+# Also Boring
+x NNNN ....
+. EEEE xxxx
+100
+
+# Langton
+w ESWN bbbb
+b WNES wwww
+5
+
