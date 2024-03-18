@@ -1,60 +1,48 @@
-
 class Ant:
-    def __init__(self, num_moves, init_state, char_instr):
-        self.coord = (0,0)
-        self.prevDir = "S"
-        self.direction = "N"
+    def __init__(self, char_instructions, num_moves, init_char):
+        self.position = (0,0)
+        self.prev_dir = 'N'
+        self.init_state = init_char
+        self.char_instructions = char_instructions
         self.num_moves = num_moves
-        self.board = { (0,0) : init_state }
-        self.char_instr = char_instr
+        self.board = { (0,0) : init_char }
+        self.idx = {}
 
     def move(self):
-        return 'helloooooo'
+        return 'moved'
 
-class Runner:
+class Ants:
     def __init__(self, filename):
         self.filename = filename
-        self.num_moves = -1
-        self.char_instr = {}
-        self.init_char = None
-        self.ants = []
 
-    def read_file(self):
+    def read_input(self):
         lines = [line.strip() for line in open(self.filename, "r").readlines()]
+        char_instr = {}
+        num_moves = None
+        first_char = None
         for line in lines:
             if not line:
-                ant = Ant(self.num_moves, self.char_instr, self.init_char)
-                self.ants.append(ant)
-                self.init_char = None
-                self.num_moves = -1
-                self.char_instr.clear()
+                ant = Ant(char_instr, num_moves, first_char)
+                print(ant.move())
 
-                output = ant.move()
-                print(output)
+                # reset ant data
+                first_char = None
+                num_moves = None
+                char_instr.clear()
                 continue
             elif all(c.isdigit() or c.isspace() for c in line):
-                self.num_moves = int(line)
+                num_moves = int(line)
                 continue
             elif line[0] == '#':
                 print(line)
                 continue
 
-            init_char, instrs, states = line.split()
-            dir_instrs = {}
-            state_instrs = {}
-            for i in range(len(instrs)):
-                self.init_char = init_char if not self.init_char else self.init_char
-
-                curr = (instrs[i], i)
-                N = len(instrs)
-                next_idx = (i + 1) % N
-
-                # todo: fix storing duplicates in the case of 'EEEE xx!x'
-                dir_instrs[curr] = (instrs[next_idx], next_idx)
-                state_instrs[curr] = (states[i], i)
-
-            self.char_instr[init_char] = (dir_instrs, state_instrs)
+            init_char, dirs, states = line.split()
+            first_char = init_char if not init_char else first_char
+            # todo: what should we do if the initial direction ('N') isn't in
+            # the input?
+            char_instr[init_char] = [dirs, states]
 
 
-runner = Runner('i0.txt')
-runner.read_file()
+ants = Ants('i1.txt')
+ants.read_input()
