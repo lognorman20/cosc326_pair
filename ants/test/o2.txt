@@ -1,0 +1,14 @@
+w ESWN bbbb
+b WNES wwww
+4
+# 0 0 
+
+w ESWN bbbb
+b WNES wwww
+8
+# 0 0 
+
+w ESWN bbbb
+b WNES wwww
+13
+# -1 0 

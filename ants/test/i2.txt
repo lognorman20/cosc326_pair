@@ -1,0 +1,12 @@
+# testing out going in circles
+w ESWN bbbb
+b WNES wwww
+4
+
+w ESWN bbbb
+b WNES wwww
+8
+
+w ESWN bbbb
+b WNES wwww
+13
