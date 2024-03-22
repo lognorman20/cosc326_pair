@@ -6,20 +6,57 @@ class Ant:
     An object representing the movement of an ant
     '''
     def __init__(self, dna, num_moves, init_char):
-        self.position = (0,0)
+        self.position = (0, 0)
         self.positions = [self.position]
+        self.directionHistory = []
+        self.bounds = [0, 0, 0, 0] # maxX, maxY, minX, minY
+        self.numMovesWhenPushedBound = [[],[],[],[]] 
         self.curr_dir = 'N'
         self.init_state = init_char
         self.dna = dna
         self.num_moves = num_moves
-        self.board = { (0,0) : init_char }
+        self.board = {(0, 0): init_char}
 
-    def get_idx(self, dir):
+    DIR_CHANGES = {
+        'N': (0, 1),
+        'E': (1, 0),
+        'S': (0, -1),
+        'W': (-1, 0)
+    }
+
+    @staticmethod
+    def get_idx(dir):
         '''
         Gets the index of a cardinal direction in the array ['N','E','S','W']
         @return - an integer for the index if successful, else -1
         '''
         return ['N', 'E', 'S', 'W'].index(dir)
+    
+    @staticmethod
+    def getPositionChange(moves):
+        '''
+        Given a list of moves (N, E, S, W characters), this function returns the change
+        in position that would result from following the moves in order.
+        '''
+        x, y = 0, 0
+        for positionChange in (Ant.DIR_CHANGES[move] for move in moves):
+            x += positionChange[0]
+            y += positionChange[1]
+        return (x, y)
+
+    def fastFoward(self, loopLen):
+        '''
+        Given the number of steps back from the current position that the loop starts,
+        this function calculates and sets the final position of the ant if it were to
+        repeat the loop until running out of moves.
+        '''
+        numExtraMoves = self.num_moves % loopLen
+        numFullLoops = int((self.num_moves - numExtraMoves) / loopLen)
+        fullLoopChange = Ant.getPositionChange(self.directionHistory[-loopLen:])
+        extraMovesChange = Ant.getPositionChange(self.directionHistory[-loopLen:-(loopLen-numExtraMoves)])
+        self.position = (self.position[0] + fullLoopChange[0] * numFullLoops + extraMovesChange[0],
+                         self.position[1] + fullLoopChange[1] * numFullLoops + extraMovesChange[1])
+        self.num_moves = 0
 
     def graph(self):
         '''
@@ -34,7 +71,7 @@ class Ant:
         plt.ylabel('Y')
         plt.title('Continuous Path of Points')
         plt.grid(True)
-        
+
         # give padding in the graph
         plt.xlim(min(x_values) - 1, max(x_values) + 1)
         plt.ylim(min(y_values) - 1, max(y_values) + 1)
@@ -42,49 +79,84 @@ class Ant:
         # annotate the start and end points
         start_point = self.positions[0]
         end_point = self.positions[-1]
-        plt.annotate('Start', start_point, textcoords="offset points", xytext=(0,10), ha='center')
-        plt.annotate('End', end_point, textcoords="offset points", xytext=(0,10), ha='center')
+        plt.annotate('Start', start_point,
+                     textcoords="offset points", xytext=(0, 10), ha='center')
+        plt.annotate('End', end_point, textcoords="offset points",
+                     xytext=(0, 10), ha='center')
         plt.show()
+
+    def findHighwayLoop(self, numMovesWhenPushedBound):
+        '''
+        When on an interation that increased the maximum or minimum bound on some axis,
+        taking into account past iterations which have increased the bound on the same
+        axis, this function returns the length of a loop if one is found, else None. 
+        '''
+        for numMovesAtPush in reversed(numMovesWhenPushedBound[:-1]):
+            stepsBack = numMovesAtPush - self.num_moves
+            if all((self.directionHistory[-stepsBack-j] == self.directionHistory[-j]) for j in range(0, stepsBack)):
+                return stepsBack
+        return None
+
+    def findLoops(self):
+        '''
+        Records data used for finding loops in the future, and searches for loops.
+        Returns the length of the loop if one is found, else None.
+        '''
+        self.directionHistory.append(self.curr_dir)
+        x, y = self.position
+        for i, coord in enumerate([x,y,-x,-y]):
+            if self.bounds[i] < coord:
+                self.bounds[i] = coord 
+                self.numMovesWhenPushedBound[i].append(self.num_moves)
+                loopLen = self.findHighwayLoop(self.numMovesWhenPushedBound[i])
+                if loopLen != None:
+                    return loopLen
+
+        return None
 
     def move(self):
         '''
         Simulates the movement of a given ant from its input DNA and first char 
         @return - a tuple of the final position after moving
         '''
-        DIR_CHANGES = {
-            'N': (0, 1),
-            'E': (1, 0),
-            'S': (0, -1),
-            'W': (-1, 0)
-        }
 
         while self.num_moves > 0:
             # get the char of the position the ant is currently at
-            curr_state = self.board.get(self.position, self.init_state)
-            dir_idx = self.get_idx(self.curr_dir)
-            next_dir = self.dna[curr_state][0][dir_idx]
-            set_state = self.dna[curr_state][1][dir_idx]
 
-            # set the state of the current space
-            self.board[self.position] = set_state
+            loopLen = self.findLoops()
+            if loopLen != None and True:
+                print("Fast fowarding...")
+                self.fastFoward(loopLen)
+            else:
+                curr_state = self.board.get(self.position, self.init_state)
+                dir_idx = Ant.get_idx(self.curr_dir)
+                next_dir = self.dna[curr_state][0][dir_idx]
+                set_state = self.dna[curr_state][1][dir_idx]
 
-            # go to the new position
-            change = DIR_CHANGES[next_dir]
-            self.position = (self.position[0] + change[0], self.position[1] + change[1])
+                # set the state of the current space
+                self.board[self.position] = set_state
 
-            # maintain a log of positions for graphing
-            self.positions.append(self.position)
+                # go to the new position
+                change = Ant.DIR_CHANGES[next_dir]
+                self.position = (
+                    self.position[0] + change[0], self.position[1] + change[1])
 
-            # update ant state
-            self.curr_dir = next_dir
-            self.num_moves -= 1
+                # maintain a log of positions for graphing
+                self.positions.append(self.position)
+                # self.positions.append(self.position)
+
+                # update ant state
+                self.curr_dir = next_dir
+                self.num_moves -= 1
 
         return self.position
+
 
 class AntSimulator:
     '''
     An environment to run the simulation of the movement of an ant.
     '''
+
     def __init__(self, file):
         self.file = file
         self.ants = []
@@ -109,7 +181,7 @@ class AntSimulator:
                 ant = Ant(dna, num_moves, first_char)
                 output_pos = ant.move()
                 self.ants.append(ant)
-                
+
                 # print the final position of the ant after moving
                 print(num_moves)
                 print('#', output_pos[0], output_pos[1], '\n')
@@ -137,6 +209,7 @@ class AntSimulator:
         '''
         for ant in self.ants:
             ant.graph()
+
 
 # run the simulation
 if __name__ == "__main__":
