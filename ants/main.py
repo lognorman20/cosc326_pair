@@ -8,7 +8,7 @@ class Ant:
     def __init__(self, dna, num_moves, init_char):
         self.position = (0, 0)
         self.positions = [self.position]
-        self.directionHistory = []
+        self.directionHistory = ['N']
         self.bounds = [0, 0, 0, 0] # maxX, maxY, minX, minY
         self.numMovesWhenPushedBound = [[],[],[],[]] 
         self.curr_dir = 'N'
@@ -85,34 +85,32 @@ class Ant:
                      xytext=(0, 10), ha='center')
         plt.show()
 
-    def findHighwayLoop(self, numMovesWhenPushedBound):
+    def findHighwayLoops(self):
         '''
-        When on an interation that increased the maximum or minimum bound on some axis,
-        taking into account past iterations which have increased the bound on the same
-        axis, this function returns the length of a loop if one is found, else None. 
+        Detects highways (loops that result in the ant moving in a straight line away from the origin)
+        This method records the maximum and minimum x and y values that the ant has reached, which it uses
+        to detect when the ant is moving away from the origin.
+        Returns the length of the loop if one is found, else None.
         '''
-        for numMovesAtPush in reversed(numMovesWhenPushedBound[:-1]):
-            stepsBack = numMovesAtPush - self.num_moves
-            if all((self.directionHistory[-stepsBack-j] == self.directionHistory[-j]) for j in range(0, stepsBack)):
-                return stepsBack
+        x, y = self.position
+        for i, coord in enumerate([x,y,-x,-y]):
+            if coord > self.bounds[i]:
+                self.bounds[i] = coord 
+                self.numMovesWhenPushedBound[i].append(self.num_moves)
+                while (self.numMovesWhenPushedBound[i][0]-self.num_moves) > (len(self.directionHistory) / 2):
+                    self.numMovesWhenPushedBound[i].pop(0)
+                for numMovesAtPush in reversed(self.numMovesWhenPushedBound[i][:-1]):
+                    stepsBack = numMovesAtPush - self.num_moves
+                    if all((self.directionHistory[-1-stepsBack-j] == self.directionHistory[-1-j]) for j in range(0, stepsBack)):
+                        return stepsBack
         return None
 
     def findLoops(self):
         '''
-        Records data used for finding loops in the future, and searches for loops.
+        Searches for different types of loop.
         Returns the length of the loop if one is found, else None.
         '''
-        self.directionHistory.append(self.curr_dir)
-        x, y = self.position
-        for i, coord in enumerate([x,y,-x,-y]):
-            if self.bounds[i] < coord:
-                self.bounds[i] = coord 
-                self.numMovesWhenPushedBound[i].append(self.num_moves)
-                loopLen = self.findHighwayLoop(self.numMovesWhenPushedBound[i])
-                if loopLen != None:
-                    return loopLen
-
-        return None
+        return self.findHighwayLoops()
 
     def move(self):
         '''
@@ -147,6 +145,7 @@ class Ant:
 
                 # update ant state
                 self.curr_dir = next_dir
+                self.directionHistory.append(self.curr_dir)
                 self.num_moves -= 1
 
         return self.position
@@ -223,8 +222,8 @@ if __name__ == "__main__":
                 simulator.simulate()
                 simulator.visualize()
             file.close()
-        except IndexError:
-            print("Usage: python main.py <filename>")
+        # except IndexError:
+        #     print("Usage: python main.py <filename>")
         except FileNotFoundError:
             print(f"File '{filename}' not found.")
         except IOError:
