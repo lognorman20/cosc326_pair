@@ -1,5 +1,14 @@
 import sys
 from matplotlib import pyplot as plt
+from collections import deque
+from itertools import islice
+
+class AntState:
+    def __init__(self, direction, colorSet, bounds, position):
+        self.direction = direction
+        self.colorSet = colorSet
+        self.bounds = bounds
+        self.position = position
 
 class Ant:
     '''
@@ -8,14 +17,20 @@ class Ant:
     def __init__(self, dna, num_moves, init_char):
         self.position = (0, 0)
         self.positions = [self.position]
-        self.directionHistory = ['N']
-        self.bounds = [0, 0, 0, 0] # maxX, maxY, minX, minY
-        self.numMovesWhenPushedBound = [[],[],[],[]] 
         self.curr_dir = 'N'
         self.init_state = init_char
         self.dna = dna
         self.num_moves = num_moves
         self.board = {(0, 0): init_char}
+        self.doLoopDetectionAtNumMoves = num_moves - 1 
+        self.loopDetectionInterval = 2
+
+        # For loop detection:
+        self.prevStates = deque(maxlen=10000) 
+        # self.directionHistory = ['N']
+        # self.colorHistory = [init_char]
+        self.bounds = [0, 0, 0, 0] # maxX, maxY, minX, minY
+        # self.boundsHistory = [[],[],[],[]] # maxX, maxY, minX, minY. The elements in each array is the num_moves of the move which pushed the bound
 
     DIR_CHANGES = {
         'N': (0, 1),
@@ -52,8 +67,10 @@ class Ant:
         '''
         numExtraMoves = self.num_moves % loopLen
         numFullLoops = int((self.num_moves - numExtraMoves) / loopLen)
-        fullLoopChange = Ant.getPositionChange(self.directionHistory[-loopLen:])
-        extraMovesChange = Ant.getPositionChange(self.directionHistory[-loopLen:-(loopLen-numExtraMoves)])
+        # fullLoopChange = Ant.getPositionChange(direction for direction in self.directionHistory[-loopLen:-1])
+        fullLoopChange = (self.prevStates[-1].position[0] - self.prevStates[-1-loopLen].position[0], self.prevStates[-1].position[1] - self.prevStates[-1-loopLen].position[1])
+        # extraMovesChange = Ant.getPositionChange(self.directionHistory[-loopLen:-(loopLen-numExtraMoves)])
+        extraMovesChange = (self.prevStates[-1-loopLen+numExtraMoves].position[0] - self.prevStates[-1-loopLen].position[0], self.prevStates[-1-loopLen+numExtraMoves].position[1] - self.prevStates[-1-loopLen].position[1])
         self.position = (self.position[0] + fullLoopChange[0] * numFullLoops + extraMovesChange[0],
                          self.position[1] + fullLoopChange[1] * numFullLoops + extraMovesChange[1])
         self.num_moves = 0
@@ -85,32 +102,81 @@ class Ant:
                      xytext=(0, 10), ha='center')
         plt.show()
 
-    def findHighwayLoops(self):
+    # def findHighwayLoops(self):
+    #     '''
+    #     Detects highways (loops that result in the ant moving in a straight line away from the origin)
+    #     This method records the maximum and minimum x and y values that the ant has reached, which it uses
+    #     to detect when the ant is moving away from the origin.
+    #     Returns the length of the loop if one is found, else None.
+    #     '''
+    #     x, y = self.position
+    #     for i, coord in enumerate([x,y,-x,-y]):
+    #         if coord > self.bounds[i]:
+    #             self.bounds[i] = coord 
+    #             self.numMovesWhenPushedBound[i].append(self.num_moves)
+    #             while (self.numMovesWhenPushedBound[i][0]-self.num_moves) > (len(self.directionHistory) / 2):
+    #                 self.numMovesWhenPushedBound[i].pop(0)
+    #             for numMovesAtPush in reversed(self.numMovesWhenPushedBound[i][:-1]):
+    #                 stepsBack = numMovesAtPush - self.num_moves
+    #                 if all((self.directionHistory[-1-stepsBack-j] == self.directionHistory[-1-j]) for j in range(0, stepsBack)):
+    #                     return stepsBack
+    #     return None
+
+    @staticmethod
+    def doBoundsIntersect(bounds1, bounds2):
         '''
-        Detects highways (loops that result in the ant moving in a straight line away from the origin)
-        This method records the maximum and minimum x and y values that the ant has reached, which it uses
-        to detect when the ant is moving away from the origin.
-        Returns the length of the loop if one is found, else None.
+        Given two sets of bounds, this function returns whether the two sets intersect at all (rectangle intersection)
         '''
-        x, y = self.position
-        for i, coord in enumerate([x,y,-x,-y]):
-            if coord > self.bounds[i]:
-                self.bounds[i] = coord 
-                self.numMovesWhenPushedBound[i].append(self.num_moves)
-                while (self.numMovesWhenPushedBound[i][0]-self.num_moves) > (len(self.directionHistory) / 2):
-                    self.numMovesWhenPushedBound[i].pop(0)
-                for numMovesAtPush in reversed(self.numMovesWhenPushedBound[i][:-1]):
-                    stepsBack = numMovesAtPush - self.num_moves
-                    if all((self.directionHistory[-1-stepsBack-j] == self.directionHistory[-1-j]) for j in range(0, stepsBack)):
-                        return stepsBack
-        return None
+        return not (bounds1[0] < bounds2[2] or bounds1[2] > bounds2[0] or bounds1[1] < bounds2[3] or bounds1[3] > bounds2[1])
+    
+    @staticmethod
+    def calculateBounds(positions):
+        '''
+        Given a list of positions, this function calculates the bounds of the positions.
+        '''
+        numPos = len(positions)
+        maxX = max(position[0] for position in positions)
+        maxY = max(position[1] for position in positions)
+        minX = min(position[0] for position in positions)
+        minY = min(position[1] for position in positions)
+        return [maxX, maxY, minX, minY]
+    
+    def detectHighwayLoop(self, loopLen):
+        psLength = len(self.prevStates)
+        latestLoopBounds = Ant.calculateBounds([prevState.position for prevState in islice(self.prevStates, psLength - loopLen, psLength)])
+        currentLoopIndex = psLength - loopLen - 1
+        while (currentLoopIndex > loopLen*2 and self.detectLoop(psLength-currentLoopIndex,loopLen)):
+            prevBounds = self.prevStates[currentLoopIndex].bounds
+            if (not Ant.doBoundsIntersect(latestLoopBounds, prevBounds)):
+                print("It's a highway!")
+                print("Loop length: ", loopLen)
+                return True
+            currentLoopIndex -= loopLen
+        return False
+
+    def detectStationaryLoop(self, loopLen):
+        return self.prevStates[-loopLen].position == self.prevStates[-2*loopLen].position
+    
+    def detectLoop(self, stepsBack, loopLen):
+        '''
+        Do the [loopLen] moves ending [stepsBack] moves ago match the [loopLen] moves that came before them?
+        '''
+        for i in range(0, loopLen):
+            if (self.prevStates[-1-stepsBack-i].direction != self.prevStates[-1-stepsBack-i-loopLen].direction or
+               self.prevStates[-1-stepsBack-i].colorSet != self.prevStates[-1-stepsBack-i-loopLen].colorSet):
+                return False
+        return True
 
     def findLoops(self):
         '''
         Searches for different types of loop.
         Returns the length of the loop if one is found, else None.
         '''
-        return self.findHighwayLoops()
+        for i in range(1, int(len(self.prevStates)/2)):
+            if (self.detectLoop(0, i) and (self.detectStationaryLoop(i) or self.detectHighwayLoop(i))):
+                return i
+        return None
+
 
     def move(self):
         '''
@@ -121,32 +187,44 @@ class Ant:
         while self.num_moves > 0:
             # get the char of the position the ant is currently at
 
-            loopLen = self.findLoops()
-            if loopLen != None and True:
-                print("Fast fowarding...")
-                self.fastFoward(loopLen)
-            else:
-                curr_state = self.board.get(self.position, self.init_state)
-                dir_idx = Ant.get_idx(self.curr_dir)
-                next_dir = self.dna[curr_state][0][dir_idx]
-                set_state = self.dna[curr_state][1][dir_idx]
+            if (self.num_moves == self.doLoopDetectionAtNumMoves):
+                loopLen = self.findLoops()
+                if loopLen != None:
+                    print("Fast fowarding...")
+                    self.fastFoward(loopLen)
+                    break
+                self.loopDetectionInterval *= 1.2
+                self.doLoopDetectionAtNumMoves = self.num_moves - int(self.loopDetectionInterval)
+            curr_state = self.board.get(self.position, self.init_state)
+            dir_idx = Ant.get_idx(self.curr_dir)
+            next_dir = self.dna[curr_state][0][dir_idx]
+            set_state = self.dna[curr_state][1][dir_idx]
 
-                # set the state of the current space
-                self.board[self.position] = set_state
+            # set the state of the current space
+            self.board[self.position] = set_state
 
-                # go to the new position
-                change = Ant.DIR_CHANGES[next_dir]
-                self.position = (
-                    self.position[0] + change[0], self.position[1] + change[1])
+            # go to the new position
+            change = Ant.DIR_CHANGES[next_dir]
+            self.position = (
+                self.position[0] + change[0], self.position[1] + change[1])
 
-                # maintain a log of positions for graphing
-                self.positions.append(self.position)
-                # self.positions.append(self.position)
+            # maintain a log of positions for graphing
+            self.positions.append(self.position)
+            # self.positions.append(self.position)
 
-                # update ant state
-                self.curr_dir = next_dir
-                self.directionHistory.append(self.curr_dir)
-                self.num_moves -= 1
+            # update ant state
+            self.curr_dir = next_dir
+
+            newBounds = [0] * 4
+            newBounds[0] = max(self.position[0], self.bounds[0])
+            newBounds[1] = max(self.position[1], self.bounds[1])
+            newBounds[2] = min(self.position[0], self.bounds[2])
+            newBounds[3] = min(self.position[1], self.bounds[3])
+            self.bounds = newBounds
+
+            
+            self.num_moves -= 1
+            self.prevStates.append(AntState(self.curr_dir, set_state, newBounds, self.position))
 
         return self.position
 
