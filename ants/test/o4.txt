@@ -1,0 +1,34 @@
+# Up and down
+. SENE ....
+100
+# 0 0 
+
+# Langton
+w ESWN bbbb
+b WNES wwww
+120000
+# -2130 -2108 
+
+# RLR (Does not form highway)
+a ESWN bbbb
+b WNES cccc
+c ESWN aaaa
+500000
+# -6 10 
+
+# LLRRRLRLRLLR (Convoluted highway eventually forms)
+a WNES bbbb
+b WNES cccc
+c ESWN dddd
+d ESWN eeee
+e ESWN ffff
+f WNES gggg
+g ESWN hhhh
+h WNES iiii
+i ESWN jjjj
+j WNES kkkk
+k WNES llll
+l ESWN aaaa
+150000
+# -1018 -4 
+

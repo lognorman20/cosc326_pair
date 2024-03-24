@@ -7,12 +7,7 @@ x NNNN ....
 . EEEE xxxx
 100
 
-# Up and down
-. SENE ....
-100
-
 # Langton
 w ESWN bbbb
 b WNES wwww
-12000
-
+5
