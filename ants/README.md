@@ -3,7 +3,14 @@
 In this étude we simulate (some of) the behaviour of creatures related to
 Langton’s ant. For each ant simulated, a graph of the ants path is generated.
 
-__To run this code, use the following snippet:__
+## Setting up
+
+You will need Python 3.6 or later, and the `Pillow` library for image generation.
+```
+python3 -m pip install --upgrade Pillow
+```
+
+## Usage
 
 ```
 python main.py test/i<N>.txt
@@ -20,7 +27,6 @@ __Generate images for each ant:__
 mkdir images
 python main.py test/i<N>.txt -i images
 ```
-
 
 __Run `python main.py -h` for help:__
 
