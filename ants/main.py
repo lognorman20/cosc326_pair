@@ -131,22 +131,24 @@ class Ant:
         maxY = max(position[1] for position in self.board.keys())
         width = maxX - minX + 1
         height = maxY - minY + 1
+        if width > 50000 or height > 50000:
+            raise ValueError("Board is too large to generate an image")
 
         # Mapping characters to colors
         colorOptions = [(255, 45, 85),(76, 217, 100),(88, 86, 214),(255, 149, 0),(255, 204, 0),(255, 59, 48),(90, 200, 250),(0, 122, 255)]
         colorMap = {'w': (255, 255, 255), 'b': (0, 0, 0)}
-        i = 0
-        for key in self.dna.keys():
-            if key not in colorMap:
-                colorMap[key] = colorOptions[i % len(colorOptions)]
-                i += 1
 
         img = Image.new('RGB', (width, height), 'white')
         pixels = img.load()
+        i = 0
         for x in range(width):
             for y in range(height):
                 if (x + minX, y + minY) in self.board:
-                    pixels[x, height-y-1] = colorMap[self.board[(x + minX, y + minY)]]
+                    colorKey = self.board[(x + minX, y + minY)]
+                    if colorKey not in colorMap:
+                        colorMap[colorKey] = colorOptions[i % len(colorOptions)]
+                        i += 1
+                    pixels[x, height-y-1] = colorMap[colorKey]
         return img 
 
 
@@ -246,8 +248,12 @@ class AntSimulator:
         Creates an image for every ant's board state
         '''
         for i, ant in enumerate(self.ants):
-            img = ant.generateImage()
-            img.save(f"{imageDirectory}/ant_{i}.png")
+            try:
+                img = ant.generateImage()
+                img.save(f"{imageDirectory}/ant_{i}.png")
+            except ValueError as e:
+                print(f"Ant {i}: {e}", file=sys.stderr)
+
 
 
 # run the simulation
@@ -267,6 +273,11 @@ if __name__ == "__main__":
     except FileNotFoundError:
         print(f"File '{args.filename}' not found.")
         sys.exit(1)
+
+    if args.image_dir and not os.path.isdir(args.image_dir):
+        print(f"No such directory: '{args.image_dir}'")
+        sys.exit(1)
+
     try:
         simulator = AntSimulator(f, simpleMode)
         simulator.simulate()
